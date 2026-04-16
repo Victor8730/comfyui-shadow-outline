@@ -2,6 +2,7 @@ import numpy as np
 from PIL import Image, ImageFilter
 import torch
 
+
 class ShadowOrOutlineFromAlpha:
     @classmethod
     def INPUT_TYPES(cls):
@@ -9,13 +10,13 @@ class ShadowOrOutlineFromAlpha:
             "required": {
                 "image": ("IMAGE",),
                 "mode": (["shadow", "outline"], {"default": "shadow"}),
-
+                "threshold": ("INT", {"default": 10, "min": 0, "max": 255, "step": 1}),
                 "outline_thickness": ("INT", {"default": 8, "min": 1, "max": 128, "step": 1}),
+                "outline_feather": ("INT", {"default": 2, "min": 0, "max": 64, "step": 1}),
                 "outline_r": ("INT", {"default": 0, "min": 0, "max": 255, "step": 1}),
                 "outline_g": ("INT", {"default": 0, "min": 0, "max": 255, "step": 1}),
                 "outline_b": ("INT", {"default": 0, "min": 0, "max": 255, "step": 1}),
                 "outline_opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-
                 "shadow_blur": ("INT", {"default": 18, "min": 0, "max": 128, "step": 1}),
                 "shadow_expand": ("INT", {"default": 4, "min": 0, "max": 64, "step": 1}),
                 "shadow_offset_x": ("INT", {"default": 0, "min": -512, "max": 512, "step": 1}),
@@ -68,27 +69,43 @@ class ShadowOrOutlineFromAlpha:
         shifted.paste(mask_img, (int(offset_x), int(offset_y)))
         return shifted
 
-    def _make_outline_mask(self, alpha, thickness):
+    @staticmethod
+    def _threshold_alpha(alpha, threshold):
+        alpha_np = np.array(alpha).astype(np.uint8)
+        alpha_np[alpha_np < int(threshold)] = 0
+        return Image.fromarray(alpha_np, mode="L")
+
+    def _make_outline_mask(self, alpha, thickness, feather):
         expanded = alpha.filter(ImageFilter.MaxFilter(size=thickness * 2 + 1))
         orig_np = np.array(alpha).astype(np.int16)
         exp_np = np.array(expanded).astype(np.int16)
         outline_np = np.clip(exp_np - orig_np, 0, 255).astype(np.uint8)
-        return Image.fromarray(outline_np, mode="L")
+        outline = Image.fromarray(outline_np, mode="L")
+
+        if feather > 0:
+            outline = outline.filter(ImageFilter.GaussianBlur(radius=feather))
+
+        return outline
 
     def _make_shadow_mask(self, alpha, expand, blur, offset_x, offset_y):
         if expand > 0:
             alpha = alpha.filter(ImageFilter.MaxFilter(size=expand * 2 + 1))
+
         if blur > 0:
             alpha = alpha.filter(ImageFilter.GaussianBlur(radius=blur))
+
         if offset_x != 0 or offset_y != 0:
             alpha = self._shift_mask(alpha, offset_x, offset_y)
+
         return alpha
 
     def make_effect(
         self,
         image,
         mode,
+        threshold,
         outline_thickness,
+        outline_feather,
         outline_r,
         outline_g,
         outline_b,
@@ -104,13 +121,20 @@ class ShadowOrOutlineFromAlpha:
     ):
         rgba = self._tensor_to_rgba_pil(image)
         alpha = rgba.getchannel("A")
+        alpha = self._threshold_alpha(alpha, threshold)
 
         if mode == "outline":
-            effect_mask = self._make_outline_mask(alpha, outline_thickness)
+            effect_mask = self._make_outline_mask(alpha, outline_thickness, outline_feather)
             effect_mask = self._apply_opacity(effect_mask, outline_opacity)
             color = (int(outline_r), int(outline_g), int(outline_b), 0)
         else:
-            effect_mask = self._make_shadow_mask(alpha, shadow_expand, shadow_blur, shadow_offset_x, shadow_offset_y)
+            effect_mask = self._make_shadow_mask(
+                alpha,
+                shadow_expand,
+                shadow_blur,
+                shadow_offset_x,
+                shadow_offset_y,
+            )
             effect_mask = self._apply_opacity(effect_mask, shadow_opacity)
             color = (int(shadow_r), int(shadow_g), int(shadow_b), 0)
 
@@ -125,5 +149,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ShadowOrOutlineFromAlpha": " Shadow Or Outline From Alpha",
+    "ShadowOrOutlineFromAlpha": "Shadow Or Outline From Alpha",
 }

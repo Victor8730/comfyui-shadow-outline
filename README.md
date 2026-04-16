@@ -1,43 +1,48 @@
 # ComfyUI Shadow/Outline Node
 
-One node for ComfyUI that takes `IMAGE` with alpha after remove background / rembg
-and returns separately or:
+One node for ComfyUI that takes an `IMAGE` with alpha after background removal and returns either:
 - shadow only
-- stroke only
+- outline only
 
 ## Install
-1. Create folder:
+1. Create this folder:
    `ComfyUI/custom_nodes/comfyui-shadow-outline`
-2. Put the files there:
+2. Put these files into it:
    - `__init__.py`
    - `shadow_effect_node.py`
-3. reboot ComfyUI
+3. Restart ComfyUI
 
-## Where to look for a node
+## Node location
 `image/wps -> Shadow Or Outline From Alpha`
 
-## Enter
-- `image` — PNG/IMAGE with alpha after rembg
+## Input
+- `image` — PNG/IMAGE with alpha after rembg or any other background removal step
 
-## Type
-- `shadow` — builds a separate shadow from the silhouette
-- `outline` — builds a separate stroke without the animal itself
+## Modes
+- `shadow` — creates a separate shadow from the silhouette
+- `outline` — creates a separate outline without the original subject
 
-## Settings outline
+## General settings
+- `threshold` — removes weak alpha noise before creating the effect
+
+## Outline settings
 - `outline_thickness` — outline thickness
-  - `outline_r/g/b` — outline color
-- `outline_opacity` — outline transparency
+- `outline_feather` — softens outline edges
+- `outline_r/g/b` — outline color
+- `outline_opacity` — outline opacity
 
-## Settings shadow
-- `shadow_blur` — shadow blur
+## Shadow settings
+- `shadow_blur` — shadow softness
 - `shadow_expand` — silhouette expansion before blur
-- `shadow_offset_x`, `shadow_offset_y` — shadow shift
-- `shadow_opacity` — shadow transparency
+- `shadow_offset_x`, `shadow_offset_y` — shadow offset
+- `shadow_opacity` — shadow opacity
 - `shadow_r/g/b` — shadow color
 
 ## Recommended values
+
 ### For shadow
 - `mode = shadow`
+- `threshold = 10`
 - `shadow_blur = 18`
 - `shadow_expand = 4`
 - `shadow_offset_x = 0`
@@ -47,9 +52,17 @@ and returns separately or:
 
 ### For outline
 - `mode = outline`
+- `threshold = 10`
 - `outline_thickness = 8`
+- `outline_feather = 2`
 - `outline_opacity = 1.0`
 - `outline_r/g/b = 0/0/0`
 
 ## Important
-This node expects that the input already has an alpha channel. If the image has no alpha, the effect will be built from the entire rectangle.
+This node expects the input image to already contain an alpha channel. If the image has no alpha channel, the effect will be generated from the full rectangular image area.
+
+## Tips
+- Increase `threshold` if rembg leaves faint edge noise.
+- Increase `outline_feather` for softer sticker-like outlines.
+- Increase `shadow_expand` for a wider shadow shape.
+- Increase `shadow_blur` for a softer shadow.
